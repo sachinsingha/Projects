@@ -3,6 +3,7 @@ import FormBuilder from "./components/Builder/FormBuilder";
 import FormPreview from "./pages/FormPreview";
 import FormSubmit from "./pages/FormSubmit";
 import FormResponses from "./pages/FormResponses";
+import FormDashboard from "./pages/FormDashboard";
 
 
 function App() {
@@ -14,6 +15,8 @@ function App() {
           <Route path="/form/:id" element={<FormPreview />} />
           <Route path="/submit/:formId" element={<FormSubmit />} />
           <Route path="/responses/:formId" element={<FormResponses />} />
+          <Route path="/dashboard" element={<FormDashboard />} />
+
         </Routes>
       </main>
     </Router>
