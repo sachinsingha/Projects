@@ -4,19 +4,19 @@ import FormPreview from "./pages/FormPreview";
 import FormSubmit from "./pages/FormSubmit";
 import FormResponses from "./pages/FormResponses";
 import FormDashboard from "./pages/FormDashboard";
-
+import LandingPage from "./pages/LandingPage";
 
 function App() {
   return (
     <Router>
-      <main className="min-h-screen bg-gray-100 p-6">
+      <main className="min-h-screen">
         <Routes>
-          <Route path="/" element={<FormBuilder />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/builder" element={<FormBuilder />} />
           <Route path="/form/:id" element={<FormPreview />} />
           <Route path="/submit/:formId" element={<FormSubmit />} />
           <Route path="/responses/:formId" element={<FormResponses />} />
           <Route path="/dashboard" element={<FormDashboard />} />
-
         </Routes>
       </main>
     </Router>
