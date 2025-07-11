@@ -36,6 +36,7 @@ mongoose
 // ------------------------
 // 🔹 FORM ROUTES
 // ------------------------
+
 app.post("/api/forms", async (req, res) => {
   try {
     const { title, fields } = req.body;
@@ -65,6 +66,7 @@ app.get("/api/forms/:id", async (req, res) => {
 // ------------------------
 // 🔸 RESPONSE ROUTES
 // ------------------------
+
 app.post("/api/responses/:formId", async (req, res) => {
   try {
     const { responses } = req.body;
@@ -113,8 +115,9 @@ app.get("/api/responses/:formId/csv", async (req, res) => {
 });
 
 // ------------------------
-// ✨ AI Field Generator (Free Model)
+// ✨ AI Field Generator
 // ------------------------
+
 app.post("/api/generate-fields", async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -125,11 +128,11 @@ app.post("/api/generate-fields", async (req, res) => {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "mistralai/mistral-7b-instruct", // ✅ Free OpenRouter Model
+        model: "mistralai/mistral-7b-instruct",
         messages: [
           {
             role: "user",
-            content: `Generate a JSON array of form fields for: "${prompt}". Each item should include "label" and "type" (text, email, number, checkbox). Example: [{"label":"Name", "type":"text"}]`,
+            content: `Only return a JSON array of form fields with "label" and "type" (text, email, number, checkbox). Example: [{"label":"Name","type":"text"}]. Now generate fields for: "${prompt}"`,
           },
         ],
       },
@@ -144,20 +147,24 @@ app.post("/api/generate-fields", async (req, res) => {
     );
 
     const content = response.data.choices[0]?.message?.content;
-    if (!content) throw new Error("No response content received");
+    if (!content) throw new Error("No content returned by AI");
 
-    const parsed = JSON.parse(content);
+    const jsonMatch = content.match(/\[\s*{[\s\S]*}\s*\]/);
+    if (!jsonMatch) throw new Error("No valid JSON array found in AI response");
+
+    const parsed = JSON.parse(jsonMatch[0]);
     res.json({ fields: parsed });
   } catch (err) {
     const msg = err.response?.data?.error?.message || err.message || "Unknown AI error";
     console.error("❌ OpenRouter GPT error:", msg);
-    res.status(500).json({ error: "Failed to generate fields using AI" });
+    res.status(500).json({ error: msg });
   }
 });
 
 // ------------------------
-// ✅ Start Server
+// ✅ Server Start
 // ------------------------
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
