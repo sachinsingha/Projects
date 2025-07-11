@@ -2,21 +2,19 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
-import OpenAI from "openai";
+import axios from "axios";
 import { Parser } from "json2csv";
 
 import Form from "./models/Form.js";
 import Response from "./models/Response.js";
 
-
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// 🔑 OpenAI Setup
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// 🧱 Middleware
+// ------------------------
+// 🌐 Middleware
+// ------------------------
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
 app.use((req, _, next) => {
@@ -24,19 +22,20 @@ app.use((req, _, next) => {
   next();
 });
 
-// 🔌 MongoDB Connection
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log("✅ MongoDB connected"))
-.catch(err => console.error("❌ MongoDB connection error:", err));
+// ------------------------
+// 🔗 MongoDB Connection
+// ------------------------
+mongoose
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// ==============================
-// 🔹 API ROUTES
-// ==============================
-
-// Create a new form
+// ------------------------
+// 🔹 FORM ROUTES
+// ------------------------
 app.post("/api/forms", async (req, res) => {
   try {
     const { title, fields } = req.body;
@@ -52,7 +51,6 @@ app.post("/api/forms", async (req, res) => {
   }
 });
 
-// Get a form by ID
 app.get("/api/forms/:id", async (req, res) => {
   try {
     const form = await Form.findById(req.params.id);
@@ -64,14 +62,15 @@ app.get("/api/forms/:id", async (req, res) => {
   }
 });
 
-// Submit form response
+// ------------------------
+// 🔸 RESPONSE ROUTES
+// ------------------------
 app.post("/api/responses/:formId", async (req, res) => {
   try {
     const { responses } = req.body;
     if (!responses || typeof responses !== "object") {
       return res.status(400).json({ error: "Invalid response data" });
     }
-
     const responseDoc = new Response({ formId: req.params.formId, responses });
     await responseDoc.save();
     res.status(201).json({ message: "Response saved" });
@@ -81,7 +80,6 @@ app.post("/api/responses/:formId", async (req, res) => {
   }
 });
 
-// Get all responses for a form
 app.get("/api/responses/:formId", async (req, res) => {
   try {
     const responses = await Response.find({ formId: req.params.formId }).sort({ createdAt: -1 });
@@ -92,13 +90,12 @@ app.get("/api/responses/:formId", async (req, res) => {
   }
 });
 
-// Export responses to CSV
 app.get("/api/responses/:formId/csv", async (req, res) => {
   try {
     const responses = await Response.find({ formId: req.params.formId });
     if (!responses.length) return res.status(404).json({ error: "No responses found" });
 
-    const formatted = responses.map(r => ({
+    const formatted = responses.map((r) => ({
       ...r.responses,
       createdAt: r.createdAt,
     }));
@@ -115,7 +112,9 @@ app.get("/api/responses/:formId/csv", async (req, res) => {
   }
 });
 
-// Generate fields using GPT
+// ------------------------
+// ✨ AI Field Generator (Safe JSON via OpenRouter)
+// ------------------------
 app.post("/api/generate-fields", async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -123,25 +122,46 @@ app.post("/api/generate-fields", async (req, res) => {
       return res.status(400).json({ error: "Prompt is required" });
     }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{
-        role: "user",
-        content: `Generate JSON form fields for: "${prompt}". Return an array of objects with "label" and "type" (text, email, number, checkbox).`,
-      }],
-    });
+    const response = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model: "mistralai/mistral-7b-instruct", // ✅ Free OpenRouter Model
+        messages: [
+          {
+            role: "user",
+            content: `Only return a JSON array of form fields with "label" and "type" (text, email, number, checkbox). Example: [{"label":"Name", "type":"text"}]. Now generate fields for: "${prompt}"`,
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "http://localhost:5173",
+          "X-Title": "SutraForm AI Generator",
+        },
+      }
+    );
 
-    const parsed = JSON.parse(completion.choices[0].message.content);
+    const content = response.data.choices[0]?.message?.content;
+    if (!content) throw new Error("No content returned by AI");
+
+    // Extract valid JSON array from the response
+    const jsonMatch = content.match(/\[.*?\]/s);
+    if (!jsonMatch) throw new Error("No valid JSON array found in AI response");
+
+    const parsed = JSON.parse(jsonMatch[0]);
     res.json({ fields: parsed });
   } catch (err) {
-    console.error("❌ GPT generation error:", err);
-    res.status(500).json({ error: "Failed to generate fields" });
+    const msg = err.response?.data?.error?.message || err.message || "Unknown AI error";
+    console.error("❌ OpenRouter GPT error:", msg);
+    res.status(500).json({ error: msg });
   }
 });
 
-// ==============================
-// 🔸 Start Server
-// ==============================
+// ------------------------
+// ✅ Start Server
+// ------------------------
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });

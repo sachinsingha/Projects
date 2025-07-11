@@ -1,4 +1,4 @@
-// FormBuilder.jsx (Responsive + Updated)
+// FormBuilder.jsx (Fully Updated with GPT Field Generator)
 import React, { useState, useEffect, useCallback } from "react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
@@ -11,7 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import FieldItem from "./FieldItem";
 import FieldPalette from "./FieldPalette";
-import { Sun, Moon, Eye, Pencil, ArrowLeftRight } from "lucide-react";
+import { Sun, Moon, Eye, Pencil, ArrowLeftRight, Sparkles } from "lucide-react";
 
 export default function FormBuilder() {
   const [formTitle, setFormTitle] = useState("");
@@ -21,6 +21,8 @@ export default function FormBuilder() {
   const [theme, setTheme] = useState("light");
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [loadingAi, setLoadingAi] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -156,6 +158,33 @@ export default function FormBuilder() {
     localStorage.setItem("sutraform-theme", newTheme);
   };
 
+  const generateWithAI = async () => {
+    if (!aiPrompt.trim()) return alert("Prompt is empty");
+    setLoadingAi(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/generate-fields", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: aiPrompt }),
+      });
+      const data = await res.json();
+      const gptFields = (data.fields || []).map((f) => ({
+        id: nanoid(),
+        label: f.label,
+        type: f.type,
+        required: false,
+        options: f.type === "dropdown" ? ["Option 1", "Option 2"] : undefined,
+      }));
+      const newFields = [...fields, ...gptFields];
+      setFields(newFields);
+      saveHistory(newFields);
+      setAiPrompt("");
+    } catch (err) {
+      alert("❌ AI generation failed");
+    }
+    setLoadingAi(false);
+  };
+
   return (
     <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-white dark:bg-zinc-900 text-gray-900 dark:text-white">
       {/* Sidebar */}
@@ -175,11 +204,30 @@ export default function FormBuilder() {
               </button>
             </div>
             <FieldPalette onAddField={addField} />
+
+            {/* AI Generator */}
+            <div className="mt-6">
+              <label className="text-sm font-medium">AI Field Generator</label>
+              <textarea
+                rows={2}
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="E.g. Contact form for job application"
+                className="w-full mt-1 p-2 border border-gray-300 rounded dark:bg-zinc-700 dark:border-zinc-600"
+              />
+              <button
+                onClick={generateWithAI}
+                disabled={loadingAi}
+                className="mt-2 w-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white py-2 rounded hover:opacity-90 flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" /> {loadingAi ? "Generating..." : "Generate with AI"}
+              </button>
+            </div>
           </motion.aside>
         )}
       </AnimatePresence>
 
-      {/* Main Builder Panel */}
+      {/* Main Panel */}
       <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-2 flex-wrap">
@@ -204,8 +252,7 @@ export default function FormBuilder() {
               onClick={() => setMode(mode === "edit" ? "preview" : "edit")}
               className="text-sm bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
             >
-              {mode === "edit" ? <Eye className="w-4 h-4 inline" /> : <Pencil className="w-4 h-4 inline" />}{" "}
-              {mode === "edit" ? "Preview" : "Edit"}
+              {mode === "edit" ? <Eye className="w-4 h-4 inline" /> : <Pencil className="w-4 h-4 inline" />} {mode === "edit" ? "Preview" : "Edit"}
             </button>
             <button
               onClick={undo}
@@ -224,12 +271,11 @@ export default function FormBuilder() {
           </div>
         </div>
 
-        {/* Canvas */}
         <div className="mt-4 border-dashed border-2 p-4 rounded dark:border-zinc-600 min-h-[200px]">
           <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={fields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
               {fields.length === 0 ? (
-                <p className="text-center text-gray-500">Add fields from the left palette</p>
+                <p className="text-center text-gray-500">Add fields from the left palette or generate with AI</p>
               ) : (
                 fields.map((field) => (
                   <motion.div layout key={field.id} className="mb-4">
