@@ -65,13 +65,14 @@ export default function LandingPage() {
       {/* Header */}
       <header className="w-full bg-white dark:bg-zinc-800 shadow-md">
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-purple-600">SutraForm</h1>
+{/* <img src="/sutra.png" alt="SutraForm Logo" className="h-10  w-20" /> */}
+<h1 className="text-2xl font-bold text-purple-600">SutraForm</h1>
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center space-x-6">
             <a href="#features" className="hover:text-purple-600 dark:hover:text-purple-400">Features</a>
-            <a href="#pricing" className="hover:text-purple-600 dark:hover:text-purple-400">Pricing</a>
-            <button className="text-sm hover:text-purple-600 dark:hover:text-purple-400">Sign In</button>
+            <a href="#pricing" className="hover:text-purple-600 dark:hover:text-purple-400">Free</a>
+            <button className="text-sm hover:text-purple-600 dark:hover:text-purple-400">Sign In/Login</button>
             <button onClick={toggleTheme} className="text-gray-700 dark:text-white">
               {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
             </button>

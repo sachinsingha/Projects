@@ -113,7 +113,7 @@ app.get("/api/responses/:formId/csv", async (req, res) => {
 });
 
 // ------------------------
-// ✨ AI Field Generator (Safe JSON via OpenRouter)
+// ✨ AI Field Generator (Free Model)
 // ------------------------
 app.post("/api/generate-fields", async (req, res) => {
   try {
@@ -129,7 +129,7 @@ app.post("/api/generate-fields", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `Only return a JSON array of form fields with "label" and "type" (text, email, number, checkbox). Example: [{"label":"Name", "type":"text"}]. Now generate fields for: "${prompt}"`,
+            content: `Generate a JSON array of form fields for: "${prompt}". Each item should include "label" and "type" (text, email, number, checkbox). Example: [{"label":"Name", "type":"text"}]`,
           },
         ],
       },
@@ -144,18 +144,14 @@ app.post("/api/generate-fields", async (req, res) => {
     );
 
     const content = response.data.choices[0]?.message?.content;
-    if (!content) throw new Error("No content returned by AI");
+    if (!content) throw new Error("No response content received");
 
-    // Extract valid JSON array from the response
-    const jsonMatch = content.match(/\[.*?\]/s);
-    if (!jsonMatch) throw new Error("No valid JSON array found in AI response");
-
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(content);
     res.json({ fields: parsed });
   } catch (err) {
     const msg = err.response?.data?.error?.message || err.message || "Unknown AI error";
     console.error("❌ OpenRouter GPT error:", msg);
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: "Failed to generate fields using AI" });
   }
 });
 
