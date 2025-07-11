@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { FaBrain } from "react-icons/fa";
 import { Menu, X, Sun, Moon } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faGithub,
+  faTwitter,
+  faLinkedin,
+  faDiscord,
+} from "@fortawesome/free-brands-svg-icons";
 
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -150,9 +157,45 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-100 dark:bg-zinc-800 text-sm text-center py-6 mt-auto text-gray-600 dark:text-gray-400">
-        © {new Date().getFullYear()} SutraForm. Built with 💜 by Sachin Singh.
-      </footer>
+      <footer className="bg-zinc-900 text-white mt-16">
+      <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8 text-center">
+        <h2 className="text-2xl sm:text-3xl font-bold mb-4">
+          Ready to build your first intelligent form?
+        </h2>
+        <p className="mb-6 text-zinc-300">
+          Join thousands of users who are already creating smarter forms with SutraForm.
+        </p>
+        <a
+          href="/"
+          className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-medium rounded shadow hover:opacity-90 transition"
+        >
+          Start Building Now →
+        </a>
+
+        <div className="mt-8 flex justify-center gap-6 text-xl">
+          <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+            <FontAwesomeIcon icon={faGithub} className="text-white hover:text-purple-400 text-2xl" />
+
+          </a>
+          <a href="https://twitter.com" target="_blank" rel="noopener noreferrer">
+            <FontAwesomeIcon icon={faTwitter} className="text-white hover:text-purple-400 text-2xl" />
+
+          </a>
+          <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer">
+          <FontAwesomeIcon icon={faLinkedin} className="text-white hover:text-purple-400 text-2xl" />
+
+          </a>
+          <a href="https://discord.gg" target="_blank" rel="noopener noreferrer">
+            <FontAwesomeIcon icon={faDiscord} className="text-white hover:text-purple-400 text-2xl" />
+
+          </a>
+        </div>
+      </div>
+
+      <div className="bg-zinc-800 text-zinc-400 text-sm py-4 px-4 text-center">
+        © 2025 SutraForm. Built with ⚡ AI power.
+      </div>
+    </footer>
     </div>
   );
 }
