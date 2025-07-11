@@ -1,193 +1,148 @@
-// src/pages/FormSubmit.jsx
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { saveAs } from "file-saver";
 import Papa from "papaparse";
+import { saveAs } from "file-saver";
 
-export default function FormSubmit() {
+const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7f50", "#00c49f"];
+
+export default function FormAnalytics() {
   const { formId } = useParams();
-  const navigate = useNavigate();
-
   const [form, setForm] = useState(null);
-  const [responses, setResponses] = useState({});
-  const [errors, setErrors] = useState({});
-  const [submitted, setSubmitted] = useState(false);
+  const [responses, setResponses] = useState([]);
 
   useEffect(() => {
     fetch(`http://localhost:5000/api/forms/${formId}`)
       .then((res) => res.json())
-      .then((data) => {
-        setForm(data);
-        const defaultValues = {};
-        data.fields.forEach((f, i) => {
-          const id = f.id || f._id || `field-${i}`;
-          defaultValues[id] = f.type === "checkbox" ? false : "";
-        });
-        setResponses(defaultValues);
-      })
-      .catch((err) => {
-        console.error("Failed to load form:", err);
-        alert("❌ Failed to load form.");
-      });
+      .then(setForm)
+      .catch((err) => console.error("Error fetching form:", err));
+
+    fetch(`http://localhost:5000/api/responses/${formId}`)
+      .then((res) => res.json())
+      .then(setResponses)
+      .catch((err) => console.error("Error fetching responses:", err));
   }, [formId]);
-
-  const handleChange = (id, value) => {
-    setResponses((prev) => ({ ...prev, [id]: value }));
-    setErrors((prev) => ({ ...prev, [id]: "" }));
-  };
-
-  const validateField = (field, value) => {
-    if (field.required && !value) return "This field is required.";
-    if (field.type === "email") {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(value)) return "Please enter a valid email.";
-    }
-    if (field.label.toLowerCase().includes("phone")) {
-      const phoneRegex = /^[0-9]{10}$/;
-      if (!phoneRegex.test(value)) return "Please enter a valid 10-digit phone number.";
-    }
-    return "";
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const newErrors = {};
-    let hasError = false;
-
-    form.fields.forEach((field, i) => {
-      const id = field.id || field._id || `field-${i}`;
-      const errorMsg = validateField(field, responses[id]);
-      if (errorMsg) {
-        newErrors[id] = errorMsg;
-        hasError = true;
-      }
-    });
-
-    if (hasError) {
-      setErrors(newErrors);
-      return;
-    }
-
-    try {
-      const res = await fetch(`http://localhost:5000/api/responses/${formId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ responses, formTitle: form.title }),
-      });
-
-      if (!res.ok) throw new Error("Submission failed");
-      setSubmitted(true);
-    } catch (err) {
-      console.error("❌ Submission error:", err);
-      alert("❌ Failed to submit form.");
-    }
-  };
 
   const handleExportPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(16);
-    doc.text(`Form Title: ${form.title}`, 14, 20);
+    doc.text(`Analytics: ${form?.title}`, 14, 20);
 
-    const rows = Object.entries(responses).map(([id, val], i) => {
-      const label = form.fields.find((f) => f.id === id || f._id === id)?.label || id;
-      return [label, typeof val === "object" ? JSON.stringify(val) : val];
+    const tableRows = responses.map((r) => {
+      return Object.values(r.responses).map((val) =>
+        typeof val === "object" ? JSON.stringify(val) : val
+      );
     });
 
     autoTable(doc, {
       startY: 30,
-      head: [["Field", "Response"]],
-      body: rows,
+      head: [form.fields.map((f) => f.label)],
+      body: tableRows,
     });
 
-    doc.save(`${form.title.replace(/\s+/g, "_")}_response.pdf`);
+    doc.save(`${form?.title || "form"}_analytics.pdf`);
   };
 
   const handleExportCSV = () => {
-    const row = {};
-    form.fields.forEach((f) => {
-      const id = f.id || f._id;
-      const val = responses[id];
-      row[f.label] = typeof val === "object" ? JSON.stringify(val) : val;
+    const data = responses.map((r) => {
+      const row = {};
+      form.fields.forEach((f) => {
+        row[f.label] = r.responses[f.id || f._id] || "";
+      });
+      return row;
     });
-
-    const csv = Papa.unparse([row]);
+    const csv = Papa.unparse(data);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    saveAs(blob, `${form.title.replace(/\s+/g, "_")}_response.csv`);
+    saveAs(blob, `${form?.title || "form"}_analytics.csv`);
   };
 
-  if (!form) return <p className="text-center mt-10">⏳ Loading form...</p>;
+  const getChartData = (field) => {
+    const counts = {};
+    responses.forEach((r) => {
+      const val = r.responses[field.id || field._id];
+      counts[val] = (counts[val] || 0) + 1;
+    });
+    return Object.entries(counts).map(([key, value]) => ({ name: key, value }));
+  };
 
-  if (submitted)
-    return (
-      <div className="max-w-md mx-auto mt-10 p-6 bg-white dark:bg-zinc-800 shadow-lg rounded text-center">
-        <h2 className="text-2xl font-semibold text-green-600 dark:text-green-400 mb-4">
-          ✅ Response submitted!
-        </h2>
-        <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 mt-6">
-          <button onClick={() => setSubmitted(false)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Fill Again</button>
-          <button onClick={() => navigate("/")} className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded">Back to Home</button>
-          <button onClick={handleExportPDF} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">Export PDF</button>
-          <button onClick={handleExportCSV} className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded">Export CSV</button>
-        </div>
-      </div>
-    );
+  if (!form) return <p className="text-center mt-10">⏳ Loading analytics...</p>;
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white shadow-md rounded">
-      <div className="mb-6">
-        <label className="block font-semibold mb-1">Form Title</label>
-        <input
-          type="text"
-          value={form.title}
-          onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-          className="w-full p-2 border border-gray-300 rounded"
-          placeholder="Enter your form title"
-          required
-        />
+    <div className="max-w-5xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-6">📊 Analytics: {form.title}</h1>
+
+      <div className="mb-6 flex gap-4">
+        <button onClick={handleExportPDF} className="bg-red-600 text-white px-4 py-2 rounded">Export PDF</button>
+        <button onClick={handleExportCSV} className="bg-yellow-500 text-white px-4 py-2 rounded">Export CSV</button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {form.fields.map((field, i) => {
-          const id = field.id || field._id || `field-${i}`;
-          const value = responses[id];
+      <h2 className="text-xl font-semibold mb-3">📥 Submissions Table</h2>
+      <div className="overflow-x-auto mb-10">
+        <table className="min-w-full table-auto border border-gray-300">
+          <thead>
+            <tr>
+              {form.fields.map((f) => (
+                <th key={f.id} className="border px-2 py-1 bg-gray-100">{f.label}</th>
+              ))}
+              <th className="border px-2 py-1 bg-gray-100">Submitted At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {responses.map((res, idx) => (
+              <tr key={idx} className="text-sm">
+                {form.fields.map((f) => (
+                  <td key={f.id} className="border px-2 py-1">
+                    {typeof res.responses[f.id || f._id] === "object"
+                      ? JSON.stringify(res.responses[f.id || f._id])
+                      : res.responses[f.id || f._id] || "-"}
+                  </td>
+                ))}
+                <td className="border px-2 py-1 text-xs">
+                  {new Date(res.createdAt).toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
+      {form.fields
+        .filter((f) => f.type === "dropdown" || f.type === "rating")
+        .map((f, i) => {
+          const chartData = getChartData(f);
           return (
-            <div key={id}>
-              <label className="block font-medium mb-1">
-                {field.label} {field.required && <span className="text-red-500">*</span>}
-              </label>
-
-              {field.type === "longtext" ? (
-                <textarea rows={3} value={value} onChange={(e) => handleChange(id, e.target.value)} required={field.required} className="w-full p-2 border border-gray-300 rounded" />
-              ) : field.type === "dropdown" ? (
-                <select value={value} onChange={(e) => handleChange(id, e.target.value)} required={field.required} className="w-full p-2 border border-gray-300 rounded">
-                  <option value="">-- Select --</option>
-                  {field.options?.map((opt, index) => <option key={index} value={opt}>{opt}</option>)}
-                </select>
-              ) : field.type === "checkbox" ? (
-                <input type="checkbox" checked={value || false} onChange={(e) => handleChange(id, e.target.checked)} className="h-5 w-5" />
-              ) : field.type === "rating" ? (
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <span key={star} className={`cursor-pointer text-2xl ${value >= star ? "text-yellow-400" : "text-gray-300"}`} onClick={() => handleChange(id, star)}>★</span>
-                  ))}
+            <div key={f.id} className="mb-12">
+              <h3 className="font-semibold mb-2">📈 {f.label}</h3>
+              <div className="flex flex-col lg:flex-row gap-6">
+                <div className="w-full lg:w-1/2 h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <XAxis dataKey="name" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="value" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              ) : field.type === "file" ? (
-                <input type="file" onChange={(e) => handleChange(id, e.target.files?.[0] || "")} required={field.required} className="w-full" />
-              ) : (
-                <input type={field.type} value={value} onChange={(e) => handleChange(id, e.target.value)} required={field.required} className="w-full p-2 border border-gray-300 rounded" />
-              )}
-
-              {errors[id] && <p className="text-red-500 text-sm mt-1">{errors[id]}</p>}
+                <div className="w-full lg:w-1/2 h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={chartData} dataKey="value" nameKey="name" outerRadius={80} fill="#82ca9d" label>
+                        {chartData.map((entry, idx) => (
+                          <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           );
         })}
-
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Submit</button>
-      </form>
     </div>
   );
 }
